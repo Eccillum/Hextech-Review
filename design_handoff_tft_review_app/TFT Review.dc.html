@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#0E1420;color:#E9EEF7;font-family:'IBM Plex Sans',sans-serif;}
+a{color:#DCA84F;text-decoration:none;} a:hover{color:#EBC276;text-decoration:underline;}
+*{box-sizing:border-box;}
+input:focus,textarea:focus,select:focus{border-color:#DCA84F !important;}
+::-webkit-scrollbar{width:10px;height:10px;} ::-webkit-scrollbar-thumb{background:#263248;border-radius:5px;} ::-webkit-scrollbar-track{background:transparent;}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0E1420;display:flex;flex-direction:column;">
+  <header style="display:flex;align-items:center;gap:32px;padding:0 32px;height:64px;border-bottom:1px solid #1E2941;background:#111827;position:sticky;top:0;z-index:20;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#DCA84F,#8A5F1E);display:flex;align-items:center;justify-content:center;font:700 15px 'Space Grotesk',sans-serif;color:#0E1420;">R</div>
+      <div style="font:600 17px 'Space Grotesk',sans-serif;letter-spacing:0.2px;">Reroll Review</div>
+    </div>
+    <nav style="display:flex;gap:4px;flex:1;">
+      <button onClick="{{ goDash }}" style="{{ tabDashStyle }}" style-hover="color:#E9EEF7">Dashboard</button>
+      <button onClick="{{ goLog }}" style="{{ tabLogStyle }}" style-hover="color:#E9EEF7">Game Log</button>
+      <button onClick="{{ goImport }}" style="{{ tabImportStyle }}" style-hover="color:#E9EEF7">Import</button>
+    </nav>
+    <button onClick="{{ startEntry }}" style="background:#DCA84F;color:#181205;border:none;border-radius:8px;padding:10px 18px;font:600 14px 'IBM Plex Sans',sans-serif;cursor:pointer;" style-hover="background:#EBC276">+ Log Game</button>
+  </header>
+
+  <sc-if value="{{ showDash }}" hint-placeholder-val="{{ true }}">
+  <main style="padding:28px 32px 48px;max-width:1240px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:20px;">
+    <sc-if value="{{ noGames }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px dashed #2C3A55;border-radius:14px;padding:64px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
+        <div style="font:600 22px 'Space Grotesk',sans-serif;">No games logged yet</div>
+        <div style="color:#8B97AD;font-size:14px;max-width:420px;">Log your first VOD review to start tracking placement trends and mistake patterns.</div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <button onClick="{{ startEntry }}" style="background:#DCA84F;color:#181205;border:none;border-radius:8px;padding:11px 20px;font:600 14px 'IBM Plex Sans',sans-serif;cursor:pointer;">Log your first game</button>
+          <button onClick="{{ loadSamples }}" style="background:transparent;color:#8B97AD;border:1px solid #2C3A55;border-radius:8px;padding:11px 20px;font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer;" style-hover="color:#E9EEF7;border-color:#DCA84F">Load 40 sample games</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hasGames }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:12px;color:#8B97AD;text-transform:uppercase;letter-spacing:0.8px;">{{ k.label }}</div>
+            <div style="font:600 28px 'IBM Plex Mono',monospace;color:{{ k.color }};">{{ k.value }}</div>
+            <div style="font-size:12px;color:#5C6980;">{{ k.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:3fr 2fr;gap:20px;align-items:start;">
+        <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;">
+            <div style="font:600 15px 'Space Grotesk',sans-serif;">Placement over time</div>
+            <div style="font-size:12px;color:#8B97AD;">gold = rolling avg ({{ rollingWindow }} games)</div>
+          </div>
+          <svg viewBox="0 0 640 220" style="width:100%;height:auto;display:block;">
+            <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+              <line x1="28" x2="640" y1="{{ g.y }}" y2="{{ g.y }}" stroke="#1E2941" stroke-width="1"></line>
+              <text x="0" y="{{ g.ty }}" fill="#5C6980" font-size="11" font-family="IBM Plex Mono">{{ g.label }}</text>
+            </sc-for>
+            <sc-for list="{{ trendDots }}" as="d" hint-placeholder-count="0">
+              <circle cx="{{ d.x }}" cy="{{ d.y }}" r="3" fill="{{ d.color }}" opacity="0.55"></circle>
+            </sc-for>
+            <path d="{{ rollingPath }}" fill="none" stroke="#DCA84F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+
+        <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;">
+          <div style="font:600 15px 'Space Grotesk',sans-serif;">Mistakes by month</div>
+          <sc-for list="{{ mistakeMonths }}" as="m" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:#8B97AD;"><span>{{ m.label }}</span><span style="font-family:'IBM Plex Mono',monospace;">{{ m.total }}</span></div>
+              <div style="display:flex;height:14px;border-radius:4px;overflow:hidden;background:#0E1420;">
+                <sc-for list="{{ m.segments }}" as="s" hint-placeholder-count="2">
+                  <div title="{{ s.name }}: {{ s.count }}" style="width:{{ s.width }}%;background:{{ s.color }};"></div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:2px;">
+            <sc-for list="{{ mistakeLegend }}" as="l" hint-placeholder-count="7">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8B97AD;"><span style="width:9px;height:9px;border-radius:2px;background:{{ l.color }};display:inline-block;"></span>{{ l.name }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:start;">
+        <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font:600 15px 'Space Grotesk',sans-serif;">Placement by streak type</div>
+          <sc-for list="{{ streakStats }}" as="s" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;"><span>{{ s.label }}</span><span style="font-family:'IBM Plex Mono',monospace;color:{{ s.color }};">{{ s.avg }}</span></div>
+              <div style="height:8px;border-radius:4px;background:#0E1420;overflow:hidden;"><div style="height:100%;width:{{ s.width }}%;background:{{ s.color }};border-radius:4px;"></div></div>
+              <div style="font-size:11px;color:#5C6980;">{{ s.count }} games</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font:600 15px 'Space Grotesk',sans-serif;">Augment type at 2-1</div>
+          <sc-for list="{{ augStats }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;"><span>{{ s.label }}</span><span style="font-family:'IBM Plex Mono',monospace;color:{{ s.color }};">{{ s.avg }}</span></div>
+              <div style="height:8px;border-radius:4px;background:#0E1420;overflow:hidden;"><div style="height:100%;width:{{ s.width }}%;background:{{ s.color }};border-radius:4px;"></div></div>
+              <div style="font-size:11px;color:#5C6980;">{{ s.count }} games</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:20px;">
+          <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;">
+            <div style="font:600 15px 'Space Grotesk',sans-serif;">Tilt impact</div>
+            <div style="display:flex;gap:14px;">
+              <div style="flex:1;background:#0E1420;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px;">
+                <div style="font-size:11px;color:#8B97AD;text-transform:uppercase;letter-spacing:0.6px;">Tilted</div>
+                <div style="font:600 24px 'IBM Plex Mono',monospace;color:#D66470;">{{ tiltAvg }}</div>
+                <div style="font-size:11px;color:#5C6980;">{{ tiltCount }} games</div>
+              </div>
+              <div style="flex:1;background:#0E1420;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px;">
+                <div style="font-size:11px;color:#8B97AD;text-transform:uppercase;letter-spacing:0.6px;">Calm</div>
+                <div style="font:600 24px 'IBM Plex Mono',monospace;color:#53C0A9;">{{ calmAvg }}</div>
+                <div style="font-size:11px;color:#5C6980;">{{ calmCount }} games</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:#8B97AD;">{{ tiltDelta }}</div>
+          </div>
+          <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;">
+            <div style="font:600 15px 'Space Grotesk',sans-serif;">Recent games</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ recentChips }}" as="r" hint-placeholder-count="8">
+                <button onClick="{{ r.open }}" title="{{ r.title }}" style="width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }};font:600 14px 'IBM Plex Mono',monospace;" style-hover="outline:2px solid #DCA84F">{{ r.p }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font:600 15px 'Space Grotesk',sans-serif;margin-bottom:6px;">Performance by comp</div>
+        <div style="display:grid;grid-template-columns:2.2fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0 16px;font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.7px;padding:0 8px 8px;border-bottom:1px solid #1E2941;">
+          <div>Comp</div><div style="text-align:right;">Games</div><div style="text-align:right;">Avg place</div><div style="text-align:right;">Top 4</div><div style="text-align:right;">Wins</div>
+        </div>
+        <sc-for list="{{ compStats }}" as="c" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:2.2fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0 16px;padding:9px 8px;border-bottom:1px solid #16203300;font-size:13px;align-items:center;" style-hover="background:#1B2436">
+            <div style="font-weight:500;">{{ c.comp }}</div>
+            <div style="text-align:right;font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ c.games }}</div>
+            <div style="text-align:right;font-family:'IBM Plex Mono',monospace;color:{{ c.avgColor }};">{{ c.avg }}</div>
+            <div style="text-align:right;font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ c.top4 }}</div>
+            <div style="text-align:right;font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ c.wins }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ hasSamples }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:12px;color:#5C6980;">Showing sample data — <a href="#" onClick="{{ clearSamples }}">remove sample games</a></div>
+      </sc-if>
+    </sc-if>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ showLog }}" hint-placeholder-val="{{ false }}">
+  <main style="padding:28px 32px 48px;max-width:1240px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;">
+      <div style="font:600 22px 'Space Grotesk',sans-serif;">Game Log</div>
+      <div style="font-size:13px;color:#8B97AD;">{{ gamesCount }} games</div>
+    </div>
+    <sc-if value="{{ noGames }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px dashed #2C3A55;border-radius:14px;padding:48px;text-align:center;color:#8B97AD;">Nothing here yet — log a game to get started.</div>
+    </sc-if>
+    <div style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:56px 100px 56px 1.6fr 80px 1.2fr 1fr 60px;gap:0 14px;padding:12px 18px;font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #1E2941;">
+        <div>#</div><div>Date</div><div>Place</div><div>Comp</div><div>Ended</div><div>Mistake</div><div>Augment</div><div></div>
+      </div>
+      <sc-for list="{{ logRows }}" as="g" hint-placeholder-count="6">
+        <div style="border-bottom:1px solid #131C2B;">
+          <div onClick="{{ g.toggle }}" style="display:grid;grid-template-columns:56px 100px 56px 1.6fr 80px 1.2fr 1fr 60px;gap:0 14px;padding:12px 18px;font-size:13px;align-items:center;cursor:pointer;" style-hover="background:#1B2436">
+            <div style="font-family:'IBM Plex Mono',monospace;color:#5C6980;">{{ g.idLabel }}</div>
+            <div style="color:#8B97AD;font-family:'IBM Plex Mono',monospace;font-size:12px;">{{ g.date }}</div>
+            <div><span style="display:inline-flex;width:28px;height:28px;border-radius:7px;align-items:center;justify-content:center;background:{{ g.pBg }};color:{{ g.pFg }};font:600 13px 'IBM Plex Mono',monospace;">{{ g.placement }}</span></div>
+            <div style="font-weight:500;">{{ g.comp }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ g.stage }}</div>
+            <div><span style="font-size:12px;padding:3px 9px;border-radius:20px;background:{{ g.mBg }};color:{{ g.mFg }};">{{ g.mistake }}</span></div>
+            <div style="color:#8B97AD;font-size:12px;">{{ g.augShort }}</div>
+            <div style="color:#5C6980;font-size:11px;text-align:right;">{{ g.chev }}</div>
+          </div>
+          <sc-if value="{{ g.expanded }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:6px 18px 20px;background:#111827;display:flex;flex-direction:column;gap:16px;">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+                <sc-for list="{{ g.facts }}" as="f" hint-placeholder-count="8">
+                  <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.6px;">{{ f.label }}</div>
+                    <div style="font-size:13px;color:{{ f.color }};">{{ f.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ g.hasTimeline }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <div style="font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.6px;">Decision timeline</div>
+                  <div style="display:flex;flex-direction:column;gap:6px;border-left:2px solid #263248;padding-left:14px;">
+                    <sc-for list="{{ g.timeline }}" as="t" hint-placeholder-count="2">
+                      <div style="display:flex;gap:10px;font-size:13px;"><span style="font-family:'IBM Plex Mono',monospace;color:#DCA84F;min-width:36px;">{{ t.stage }}</span><span style="color:#C6CFDE;">{{ t.note }}</span></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div style="display:flex;flex-direction:column;gap:3px;"><div style="font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.6px;">Key decision point</div><div style="font-size:13px;color:#C6CFDE;">{{ g.keyDecision }}</div></div>
+                <div style="display:flex;flex-direction:column;gap:3px;"><div style="font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.6px;">What I'd do differently</div><div style="font-size:13px;color:#C6CFDE;">{{ g.differently }}</div></div>
+              </div>
+              <div style="display:flex;gap:10px;">
+                <button onClick="{{ g.edit }}" style="background:transparent;border:1px solid #2C3A55;color:#C6CFDE;border-radius:7px;padding:7px 14px;font-size:13px;cursor:pointer;" style-hover="border-color:#DCA84F;color:#DCA84F">Edit</button>
+                <button onClick="{{ g.del }}" style="background:transparent;border:1px solid #2C3A55;color:#8B97AD;border-radius:7px;padding:7px 14px;font-size:13px;cursor:pointer;" style-hover="border-color:#D66470;color:#D66470">Delete</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ showImport }}" hint-placeholder-val="{{ false }}">
+  <main style="padding:28px 32px 48px;max-width:860px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:20px;">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="font:600 22px 'Space Grotesk',sans-serif;">Import from Riot</div>
+      <div style="font-size:13px;color:#8B97AD;">Pulls your recent TFT matches and prefills the objective fields. Augment details and final HP aren't in Riot's API — you fill those during VOD review.</div>
+    </div>
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Riot ID (GameName#TAG)
+          <input value="{{ iRiotId }}" onChange="{{ setRiotId }}" placeholder="Faker#KR1" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Region routing
+          <select value="{{ iRegion }}" onChange="{{ setRegion }}" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+            <option value="americas">Americas</option>
+            <option value="europe">Europe</option>
+            <option value="asia">Asia</option>
+            <option value="sea">SEA</option>
+          </select>
+        </label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Riot API key (dev keys expire every 24h — regenerate at developer.riotgames.com)
+        <input value="{{ iApiKey }}" onChange="{{ setApiKey }}" placeholder="RGAPI-…" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:13px 'IBM Plex Mono',monospace;outline:none;">
+      </label>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button onClick="{{ fetchMatches }}" style="background:#DCA84F;color:#181205;border:none;border-radius:8px;padding:11px 22px;font:600 14px 'IBM Plex Sans',sans-serif;cursor:pointer;" style-hover="background:#EBC276">{{ fetchLabel }}</button>
+        <div style="color:#D66470;font-size:13px;">{{ importError }}</div>
+      </div>
+    </section>
+    <sc-if value="{{ hasImportResults }}" hint-placeholder-val="{{ false }}">
+      <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:100px 56px 1.6fr 70px 60px 130px;gap:0 14px;padding:12px 18px;font-size:11px;color:#5C6980;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #1E2941;">
+          <div>Date</div><div>Place</div><div>Comp (guessed)</div><div>Ended</div><div>Level</div><div></div>
+        </div>
+        <sc-for list="{{ importRows }}" as="m" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:100px 56px 1.6fr 70px 60px 130px;gap:0 14px;padding:12px 18px;font-size:13px;align-items:center;border-bottom:1px solid #131C2B;">
+            <div style="color:#8B97AD;font-family:'IBM Plex Mono',monospace;font-size:12px;">{{ m.date }}</div>
+            <div><span style="display:inline-flex;width:28px;height:28px;border-radius:7px;align-items:center;justify-content:center;background:{{ m.pBg }};color:{{ m.pFg }};font:600 13px 'IBM Plex Mono',monospace;">{{ m.placement }}</span></div>
+            <div style="font-weight:500;">{{ m.comp }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ m.stage }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;color:#8B97AD;">{{ m.level }}</div>
+            <sc-if value="{{ m.imported }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12px;color:#53C0A9;">✓ Imported</div>
+            </sc-if>
+            <sc-if value="{{ m.notImported }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ m.review }}" style="background:transparent;border:1px solid #2C3A55;color:#DCA84F;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;white-space:nowrap;" style-hover="border-color:#DCA84F">Review &amp; save →</button>
+            </sc-if>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ showEntry }}" hint-placeholder-val="{{ false }}">
+  <main style="padding:28px 32px 120px;max-width:860px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:22px;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;">
+      <div style="font:600 22px 'Space Grotesk',sans-serif;">{{ entryTitle }}</div>
+      <div style="font-size:13px;color:#8B97AD;">Follows your VOD review order — skim top to bottom</div>
+    </div>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">1 · Result</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Date
+          <input type="date" value="{{ fDate }}" onChange="{{ setDate }}" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Stage ended (e.g. 5-3, or "Won")
+          <input value="{{ fStage }}" onChange="{{ setStage }}" placeholder="5-3" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Final HP (if you survived)
+          <input type="number" value="{{ fHp }}" onChange="{{ setHp }}" placeholder="—" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:#8B97AD;">Placement</div>
+        <div style="display:flex;gap:8px;">
+          <sc-for list="{{ placementSeg }}" as="o" hint-placeholder-count="8">
+            <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:end;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Comp played
+          <input list="comp-options" value="{{ fComp }}" onChange="{{ setComp }}" placeholder="e.g. Rapidfire Kog, Fortune reroll…" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+          <datalist id="comp-options">
+            <sc-for list="{{ compOptions }}" as="c" hint-placeholder-count="0"><option value="{{ c }}"></option></sc-for>
+          </datalist>
+        </label>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Tilted this game?</div>
+          <div style="display:flex;gap:8px;">
+            <sc-for list="{{ tiltedSeg }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">2 · Augment at 2-1</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Augment picked
+          <input value="{{ fAugName }}" onChange="{{ setAugName }}" placeholder="e.g. Pandora's Items" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Type</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <sc-for list="{{ augTypeSeg }}" as="o" hint-placeholder-count="5">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:#8B97AD;">Did it match your opener / give real direction?</div>
+        <div style="display:flex;gap:8px;">
+          <sc-for list="{{ augReadSeg }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">3 · First item slam</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:end;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">What did you slam first?
+          <input value="{{ fSlam }}" onChange="{{ setSlam }}" placeholder="e.g. Guinsoo's on Kog at 2-5" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Matched augment / opener direction?</div>
+          <div style="display:flex;gap:8px;">
+            <sc-for list="{{ slamSeg }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">4 · Tempo, econ & scouting</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Streak state</div>
+          <div style="display:flex;gap:8px;">
+            <sc-for list="{{ streakSeg }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Leveling matched the curve for that streak?</div>
+          <div style="display:flex;gap:8px;">
+            <sc-for list="{{ levelSeg }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Scouted for contested lines (3-2 → 3-5)?</div>
+          <div style="display:flex;gap:8px;">
+            <sc-for list="{{ scoutSeg }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">5 · Stage 4 &amp; positioning</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:#8B97AD;">Lost a big fight in stage 4?</div>
+        <div style="display:flex;gap:8px;">
+          <sc-for list="{{ s4Seg }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ s4On }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:end;background:#0E1420;border-radius:10px;padding:14px;">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">HP going into stage 4
+            <input type="number" value="{{ fS4hp }}" onChange="{{ setS4hp }}" placeholder="e.g. 42" style="background:#151D2C;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+          </label>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:12px;color:#8B97AD;">Avoidable by rolling a turn earlier?</div>
+            <div style="display:flex;gap:8px;">
+              <sc-for list="{{ s4AvoidSeg }}" as="o" hint-placeholder-count="2">
+                <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:end;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12px;color:#8B97AD;">Positioning issue on lost fights</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <sc-for list="{{ posSeg }}" as="o" hint-placeholder-count="4">
+              <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Positioning note
+          <input value="{{ fPosNote }}" onChange="{{ setPosNote }}" placeholder="e.g. carry got dove by assassins twice" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+        </label>
+      </div>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">6 · Decision timeline <span style="color:#5C6980;text-transform:none;letter-spacing:0;font-weight:400;">(optional)</span></div>
+        <button onClick="{{ addTimeline }}" style="background:transparent;border:1px solid #2C3A55;color:#C6CFDE;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;" style-hover="border-color:#DCA84F;color:#DCA84F">+ Add point</button>
+      </div>
+      <sc-for list="{{ timelineRows }}" as="t" hint-placeholder-count="0">
+        <div style="display:grid;grid-template-columns:90px 1fr 36px;gap:10px;align-items:center;">
+          <input value="{{ t.stage }}" onChange="{{ t.setStage }}" placeholder="3-2" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Mono',monospace;outline:none;text-align:center;">
+          <input value="{{ t.note }}" onChange="{{ t.setNote }}" placeholder="What happened / what you decided" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;">
+          <button onClick="{{ t.remove }}" style="background:transparent;border:none;color:#5C6980;font-size:16px;cursor:pointer;" style-hover="color:#D66470">✕</button>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="background:#151D2C;border:1px solid #1E2941;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+      <div style="font:600 13px 'Space Grotesk',sans-serif;color:#DCA84F;text-transform:uppercase;letter-spacing:1px;">7 · Verdict</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:#8B97AD;">Biggest mistake category this game</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <sc-for list="{{ mistakeSeg }}" as="o" hint-placeholder-count="7">
+            <button onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#DCA84F">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">Key decision point
+          <textarea value="{{ fKeyDecision }}" onChange="{{ setKeyDecision }}" rows="3" placeholder="The moment the game hinged on…" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;resize:vertical;"></textarea>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8B97AD;">What I'd do differently
+          <textarea value="{{ fDifferently }}" onChange="{{ setDifferently }}" rows="3" placeholder="Next time I will…" style="background:#0E1420;border:1px solid #263248;border-radius:8px;padding:9px 12px;color:#E9EEF7;font:14px 'IBM Plex Sans',sans-serif;outline:none;resize:vertical;"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <div style="position:fixed;bottom:0;left:0;right:0;background:#111827;border-top:1px solid #1E2941;padding:14px 32px;display:flex;justify-content:center;z-index:30;">
+      <div style="max-width:860px;width:100%;display:flex;align-items:center;gap:14px;">
+        <button onClick="{{ saveGame }}" style="background:#DCA84F;color:#181205;border:none;border-radius:8px;padding:12px 26px;font:600 15px 'IBM Plex Sans',sans-serif;cursor:pointer;" style-hover="background:#EBC276">{{ saveLabel }}</button>
+        <button onClick="{{ cancelEntry }}" style="background:transparent;border:1px solid #2C3A55;color:#8B97AD;border-radius:8px;padding:12px 20px;font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer;" style-hover="color:#E9EEF7">Cancel</button>
+        <div style="color:#D66470;font-size:13px;">{{ formError }}</div>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;rollingWindow&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 10, &quot;min&quot;: 3, &quot;max&quot;: 20, &quot;step&quot;: 1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Analysis&quot;}}">
+const KEY = 'tft-review-games-v1';
+const MISTAKES = ['Positioning','Itemization','Line/Augment','Econ','Scouting','Leveling','Tilt'];
+const MCOLORS = {'Positioning':'#6AA5E8','Itemization':'#DCA84F','Line/Augment':'#B287E0','Econ':'#58B98D','Scouting':'#53C0C0','Leveling':'#E08D5B','Tilt':'#D66470'};
+const AUGTYPES = ['Econ','Item','Combat','Trait','Hero'];
+const blankForm = () => ({date: new Date().toISOString().slice(0,10), placement: null, comp: '', stage: '', hp: '', augName: '', augType: null, augRead: null, slam: '', slamMatched: null, streak: null, levelMatched: null, scouted: null, s4loss: false, s4hp: '', s4avoid: null, posIssue: null, posNote: '', mistake: null, keyDecision: '', differently: '', tilted: false, timeline: []});
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    let games = [];
+    try { games = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) {}
+    let riot = { riotId: 'Newton#1604', region: 'americas', apiKey: 'RGAPI-db7593aa-6ccb-451c-bc43-f4cf89314bc3' };
+    try { riot = {...riot, ...JSON.parse(localStorage.getItem('tft-review-riot') || '{}')}; } catch(e) {}
+    this.state = { view: 'dashboard', games, form: blankForm(), editingId: null, expandedId: null, formError: '', riot, importing: false, importError: '', importMatches: [] };
+  }
+  setRiot(k, v) { this.setState(s => ({ riot: {...s.riot, [k]: v} })); }
+  stageFromRound(r) {
+    if (!r) return '';
+    if (r <= 4) return '1-' + r;
+    return (Math.floor((r - 5) / 7) + 2) + '-' + ((r - 5) % 7 + 1);
+  }
+  prettyTrait(t) { return (t || '').replace(/^[^_]*_/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); }
+  async fetchMatches() {
+    const { riotId, region, apiKey } = this.state.riot;
+    if (!riotId.includes('#')) { this.setState({importError: 'Riot ID must be GameName#TAG.'}); return; }
+    if (!apiKey.trim()) { this.setState({importError: 'Enter your API key.'}); return; }
+    localStorage.setItem('tft-review-riot', JSON.stringify(this.state.riot));
+    this.setState({ importing: true, importError: '' });
+    const call = async (url) => {
+      const u = url + (url.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(apiKey.trim());
+      let r = null;
+      try { r = await fetch(u); } catch (e) {}
+      if (!r) { try { r = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(u)); } catch (e) {} }
+      if (!r) throw new Error('Network blocked (CORS). Riot may require a server-side proxy.');
+      if (r.status === 401 || r.status === 403) throw new Error('Key rejected (' + r.status + ') — dev keys expire after 24h, regenerate it.');
+      if (r.status === 404) throw new Error('Riot ID not found in that region.');
+      if (!r.ok) throw new Error('Riot API error ' + r.status);
+      return r.json();
+    };
+    try {
+      const [name, tag] = riotId.split('#');
+      const base = 'https://' + region + '.api.riotgames.com';
+      const acct = await call(base + '/riot/account/v1/accounts/by-riot-id/' + encodeURIComponent(name.trim()) + '/' + encodeURIComponent(tag.trim()));
+      const ids = await call(base + '/tft/match/v1/matches/by-puuid/' + acct.puuid + '/ids?count=10');
+      const raw = [];
+      for (const id of ids) raw.push(await call(base + '/tft/match/v1/matches/' + id));
+      const matches = raw.map(m => {
+        const p = m.info.participants.find(x => x.puuid === acct.puuid);
+        if (!p) return null;
+        const traits = (p.traits || []).filter(t => t.style >= 2).sort((a,b) => b.style - a.style || b.num_units - a.num_units).slice(0, 2).map(t => this.prettyTrait(t.name));
+        return { matchId: m.metadata.match_id, date: new Date(m.info.game_datetime).toISOString().slice(0,10),
+          placement: p.placement, level: p.level, comp: traits.join(' + ') || 'Unknown',
+          stage: p.placement === 1 ? 'Won' : this.stageFromRound(p.last_round) };
+      }).filter(Boolean);
+      this.setState({ importing: false, importMatches: matches });
+    } catch (e) {
+      this.setState({ importing: false, importError: e.message });
+    }
+  }
+  persist(games) { localStorage.setItem(KEY, JSON.stringify(games)); }
+  setF(k, v) { this.setState(s => ({ form: {...s.form, [k]: v}, formError: '' })); }
+  inputF(k) { return (e) => this.setF(k, e.target.value); }
+  saveGame() {
+    const f = this.state.form;
+    if (!f.placement) { this.setState({formError: 'Pick a placement.'}); return; }
+    if (!f.comp.trim()) { this.setState({formError: 'Enter the comp you played.'}); return; }
+    let games = [...this.state.games];
+    let id = this.state.editingId;
+    if (id != null) {
+      games = games.map(g => g.id === id ? {...f, id, sample: g.sample} : g);
+    } else {
+      id = games.reduce((m,g) => Math.max(m, g.id), 0) + 1;
+      games.push({...f, id});
+    }
+    this.persist(games);
+    this.setState({ games, view: 'log', form: blankForm(), editingId: null, expandedId: id });
+  }
+  delGame(id) {
+    if (!confirm('Delete game #' + id + '?')) return;
+    const games = this.state.games.filter(g => g.id !== id);
+    this.persist(games);
+    this.setState({ games });
+  }
+  loadSamples() {
+    const comps = ['Rapidfire Kog reroll','Fortune cashout','Slayers Zed','Bruiser Cho flex','Sniper Aphelios','Duelist Yasuo reroll','Arcanist Vex','Legendary flex'];
+    const augNames = {Econ:['Rich Get Richer','Golden Egg','Level Up!'],Item:["Pandora's Items",'Component Grab Bag','Living Forge'],Combat:['Cybernetic Uplink','Thrill of the Hunt','Featherweights'],Trait:['Duelist Heart','Sniper Crest','Bruiser Soul'],Hero:['Kog Carry','Zed Ascension','Vex Investment']};
+    const rnd = (a) => a[Math.floor(Math.random()*a.length)];
+    const games = [];
+    for (let i = 0; i < 40; i++) {
+      const d = new Date(Date.now() - (85 - i*2.1) * 864e5);
+      const tilted = Math.random() < 0.2;
+      const scouted = Math.random() < 0.6;
+      const skill = (scouted ? -0.7 : 0) + (tilted ? 1.4 : 0) + (i/40)*-0.9;
+      let placement = Math.round(4.5 + skill + (Math.random()*5 - 2.5));
+      placement = Math.max(1, Math.min(8, placement));
+      const augType = rnd(AUGTYPES);
+      const streak = rnd(['win','loss','mixed']);
+      const s4loss = placement >= 5 && Math.random() < 0.55;
+      games.push({ id: i+1, sample: true, date: d.toISOString().slice(0,10), placement,
+        comp: rnd(comps), stage: placement === 1 ? 'Won' : (placement <= 4 ? '6-'+(1+Math.floor(Math.random()*5)) : (4+Math.floor(Math.random()*2))+'-'+(1+Math.floor(Math.random()*6))),
+        hp: placement === 1 ? String(20+Math.floor(Math.random()*60)) : '', augName: rnd(augNames[augType]), augType,
+        augRead: Math.random() < 0.65 ? 'matched' : 'blind', slam: rnd(["Guinsoo's early","BF + belt hold","Blue Buff on carry","Titan's on tank","Greedy component hold"]),
+        slamMatched: Math.random() < 0.7, streak, levelMatched: Math.random() < 0.6, scouted,
+        s4loss, s4hp: s4loss ? String(20+Math.floor(Math.random()*50)) : '', s4avoid: s4loss ? Math.random() < 0.5 : null,
+        posIssue: placement >= 4 ? rnd(['focus','aggro','stats','none']) : 'none', posNote: '',
+        mistake: rnd(MISTAKES), keyDecision: 'Sample game — auto-generated.', differently: '', tilted, timeline: [] });
+    }
+    this.persist(games);
+    this.setState({ games });
+  }
+  clearSamples(e) {
+    if (e) e.preventDefault();
+    const games = this.state.games.filter(g => !g.sample);
+    this.persist(games);
+    this.setState({ games });
+  }
+  seg(list, key, opts) {
+    const f = this.state.form;
+    return list.map(o => {
+      const val = o.value !== undefined ? o.value : o;
+      const label = o.label !== undefined ? o.label : String(o);
+      const on = f[key] === val;
+      return { label, pick: () => this.setF(key, val),
+        style: `background:${on ? '#DCA84F' : '#0E1420'};color:${on ? '#181205' : '#C6CFDE'};border:1px solid ${on ? '#DCA84F' : '#263248'};border-radius:8px;padding:8px ${opts && opts.wide ? '16px' : '13px'};font:${on ? '600' : '400'} 13px 'IBM Plex Sans',sans-serif;cursor:pointer;white-space:nowrap;` };
+    });
+  }
+  yn(key) { return this.seg([{label:'Yes',value:true},{label:'No',value:false}], key); }
+  pColors(p) {
+    if (p === 1) return { bg: '#DCA84F', fg: '#181205' };
+    if (p <= 4) return { bg: '#1E3A35', fg: '#53C0A9' };
+    return { bg: '#3A2028', fg: '#D66470' };
+  }
+  fmtAvg(arr) { return arr.length ? (arr.reduce((a,g)=>a+g.placement,0)/arr.length).toFixed(2) : '—'; }
+  renderVals() {
+    const s = this.state;
+    const games = [...s.games].sort((a,b) => a.date === b.date ? a.id - b.id : (a.date < b.date ? -1 : 1));
+    const n = games.length;
+    const view = s.view;
+    const rollingWindow = this.props.rollingWindow ?? 10;
+    const tabStyle = (on) => `background:transparent;border:none;cursor:pointer;font:500 14px 'IBM Plex Sans',sans-serif;padding:8px 14px;border-radius:8px;color:${on ? '#E9EEF7' : '#8B97AD'};${on ? 'background:#1B2436;' : ''}`;
+    const vals = {
+      showDash: view === 'dashboard', showLog: view === 'log', showEntry: view === 'entry', showImport: view === 'import',
+      goDash: () => this.setState({view: 'dashboard'}), goLog: () => this.setState({view: 'log'}),
+      goImport: () => this.setState({view: 'import'}),
+      tabDashStyle: tabStyle(view === 'dashboard'), tabLogStyle: tabStyle(view === 'log'), tabImportStyle: tabStyle(view === 'import'),
+      iRiotId: s.riot.riotId, setRiotId: (e) => this.setRiot('riotId', e.target.value),
+      iRegion: s.riot.region, setRegion: (e) => this.setRiot('region', e.target.value),
+      iApiKey: s.riot.apiKey, setApiKey: (e) => this.setRiot('apiKey', e.target.value),
+      fetchMatches: () => this.fetchMatches(), fetchLabel: s.importing ? 'Fetching…' : 'Fetch last 10 matches',
+      importError: s.importError, hasImportResults: s.importMatches.length > 0,
+      importRows: s.importMatches.map(m => {
+        const c = this.pColors(m.placement);
+        const done = s.games.some(g => g.riotMatchId === m.matchId);
+        return { ...m, pBg: c.bg, pFg: c.fg, imported: done, notImported: !done,
+          review: () => this.setState({ view: 'entry', editingId: null, formError: '',
+            form: {...blankForm(), date: m.date, placement: m.placement, comp: m.comp, stage: m.stage, riotMatchId: m.matchId} }) };
+      }),
+      startEntry: () => this.setState({view: 'entry', form: blankForm(), editingId: null, formError: ''}),
+      cancelEntry: () => this.setState({view: s.editingId != null ? 'log' : 'dashboard', editingId: null, formError: ''}),
+      saveGame: () => this.saveGame(),
+      loadSamples: () => this.loadSamples(), clearSamples: (e) => this.clearSamples(e),
+      noGames: n === 0, hasGames: n > 0, gamesCount: n,
+      hasSamples: games.some(g => g.sample),
+      rollingWindow,
+      entryTitle: s.editingId != null ? `Edit game #${s.editingId}` : 'Log a game',
+      saveLabel: s.editingId != null ? 'Save changes' : 'Save game',
+      formError: s.formError,
+    };
+    // --- form bindings ---
+    const f = s.form;
+    Object.assign(vals, {
+      fDate: f.date, setDate: this.inputF('date'), fStage: f.stage, setStage: this.inputF('stage'),
+      fHp: f.hp, setHp: this.inputF('hp'), fComp: f.comp, setComp: this.inputF('comp'),
+      fAugName: f.augName, setAugName: this.inputF('augName'), fSlam: f.slam, setSlam: this.inputF('slam'),
+      fS4hp: f.s4hp, setS4hp: this.inputF('s4hp'), fPosNote: f.posNote, setPosNote: this.inputF('posNote'),
+      fKeyDecision: f.keyDecision, setKeyDecision: this.inputF('keyDecision'),
+      fDifferently: f.differently, setDifferently: this.inputF('differently'),
+      placementSeg: this.seg([1,2,3,4,5,6,7,8], 'placement'),
+      tiltedSeg: this.yn('tilted'),
+      augTypeSeg: this.seg(AUGTYPES, 'augType'),
+      augReadSeg: this.seg([{label:'Matched opener / clear direction', value:'matched'},{label:'Taken blind', value:'blind'}], 'augRead'),
+      slamSeg: this.yn('slamMatched'),
+      streakSeg: this.seg([{label:'Win streak',value:'win'},{label:'Loss streak',value:'loss'},{label:'Mixed',value:'mixed'}], 'streak'),
+      levelSeg: this.yn('levelMatched'), scoutSeg: this.yn('scouted'),
+      s4Seg: this.yn('s4loss'), s4On: f.s4loss === true, s4AvoidSeg: this.yn('s4avoid'),
+      posSeg: this.seg([{label:'Focus fire',value:'focus'},{label:'Aggro pull',value:'aggro'},{label:'Stat gap',value:'stats'},{label:'None',value:'none'}], 'posIssue'),
+      mistakeSeg: this.seg(MISTAKES, 'mistake'),
+      addTimeline: () => this.setF('timeline', [...f.timeline, {stage:'', note:''}]),
+      timelineRows: f.timeline.map((t, i) => ({
+        stage: t.stage, note: t.note,
+        setStage: (e) => this.setF('timeline', f.timeline.map((x,j) => j===i ? {...x, stage: e.target.value} : x)),
+        setNote: (e) => this.setF('timeline', f.timeline.map((x,j) => j===i ? {...x, note: e.target.value} : x)),
+        remove: () => this.setF('timeline', f.timeline.filter((x,j) => j!==i)),
+      })),
+      compOptions: [...new Set(s.games.map(g => g.comp).filter(Boolean))].sort(),
+    });
+    if (n === 0) return vals;
+    // --- stats ---
+    const avg = games.reduce((a,g) => a+g.placement, 0) / n;
+    const top4 = games.filter(g => g.placement <= 4).length;
+    const wins = games.filter(g => g.placement === 1).length;
+    const recent = games.slice(-rollingWindow);
+    const recentAvg = recent.reduce((a,g) => a+g.placement, 0) / recent.length;
+    const trendDir = recentAvg < avg - 0.15 ? '↓ improving' : (recentAvg > avg + 0.15 ? '↑ worsening' : '→ steady');
+    vals.kpis = [
+      {label: 'Games logged', value: String(n), sub: 'all time', color: '#E9EEF7'},
+      {label: 'Avg placement', value: avg.toFixed(2), sub: `last ${recent.length}: ${recentAvg.toFixed(2)} ${trendDir}`, color: '#DCA84F'},
+      {label: 'Top 4 rate', value: Math.round(top4/n*100) + '%', sub: `${top4} of ${n}`, color: '#53C0A9'},
+      {label: 'Win rate', value: Math.round(wins/n*100) + '%', sub: `${wins} firsts`, color: '#6AA5E8'},
+    ];
+    // trend chart
+    const W = 640, H = 220, x0 = 32, y = (p) => 14 + (p-1)/7*186;
+    const xi = (i) => n === 1 ? W : x0 + (W - x0) * (i / Math.max(1, n-1));
+    vals.gridLines = [1,3,5,8].map(p => ({y: y(p), ty: y(p)+4, label: String(p)}));
+    vals.trendDots = games.map((g,i) => ({x: xi(i).toFixed(1), y: y(g.placement).toFixed(1), color: this.pColors(g.placement).fg === '#181205' ? '#DCA84F' : this.pColors(g.placement).fg}));
+    const roll = games.map((g,i) => {
+      const win = games.slice(Math.max(0, i-rollingWindow+1), i+1);
+      return win.reduce((a,x) => a+x.placement, 0) / win.length;
+    });
+    vals.rollingPath = roll.map((v,i) => (i===0?'M':'L') + xi(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+    // mistakes by month
+    const byMonth = {};
+    games.forEach(g => { if (!g.mistake) return; const m = g.date.slice(0,7); (byMonth[m] = byMonth[m] || {})[g.mistake] = ((byMonth[m]||{})[g.mistake]||0) + 1; });
+    const monthKeys = Object.keys(byMonth).sort().slice(-6);
+    const maxTotal = Math.max(1, ...monthKeys.map(k => Object.values(byMonth[k]).reduce((a,b)=>a+b,0)));
+    vals.mistakeMonths = monthKeys.map(k => {
+      const total = Object.values(byMonth[k]).reduce((a,b)=>a+b,0);
+      return { label: new Date(k+'-15').toLocaleDateString('en-US',{month:'short', year:'2-digit'}), total,
+        segments: MISTAKES.filter(m => byMonth[k][m]).map(m => ({name: m, count: byMonth[k][m], color: MCOLORS[m], width: (byMonth[k][m]/maxTotal*100).toFixed(1)})) };
+    });
+    vals.mistakeLegend = MISTAKES.map(m => ({name: m, color: MCOLORS[m]}));
+    // streak + augment stats
+    const statRows = (defs, getKey, colors) => defs.map((d) => {
+      const sub = games.filter(g => getKey(g) === d.value);
+      const a = sub.length ? sub.reduce((x,g)=>x+g.placement,0)/sub.length : null;
+      return { label: d.label, count: sub.length, avg: a ? a.toFixed(2) : '—', width: a ? ((9-a)/8*100).toFixed(0) : 0, color: d.color };
+    });
+    vals.streakStats = statRows([{label:'Win streak',value:'win',color:'#53C0A9'},{label:'Loss streak',value:'loss',color:'#D66470'},{label:'Mixed',value:'mixed',color:'#6AA5E8'}], g => g.streak);
+    vals.augStats = statRows([{label:'Econ',value:'Econ',color:'#DCA84F'},{label:'Item',value:'Item',color:'#6AA5E8'},{label:'Combat',value:'Combat',color:'#D66470'},{label:'Trait',value:'Trait',color:'#B287E0'},{label:'Hero',value:'Hero',color:'#53C0A9'}], g => g.augType);
+    // tilt
+    const tilted = games.filter(g => g.tilted), calm = games.filter(g => !g.tilted);
+    vals.tiltAvg = this.fmtAvg(tilted); vals.calmAvg = this.fmtAvg(calm);
+    vals.tiltCount = tilted.length; vals.calmCount = calm.length;
+    vals.tiltDelta = (tilted.length && calm.length) ? `Tilted games cost you ${(tilted.reduce((a,g)=>a+g.placement,0)/tilted.length - calm.reduce((a,g)=>a+g.placement,0)/calm.length).toFixed(1)} places on average.` : 'Not enough data to compare yet.';
+    // recent chips
+    vals.recentChips = games.slice(-12).reverse().map(g => {
+      const c = this.pColors(g.placement);
+      return { p: g.placement, bg: c.bg, fg: c.fg, title: `#${g.id} · ${g.comp}`, open: () => this.setState({view:'log', expandedId: g.id}) };
+    });
+    // comp table
+    const byComp = {};
+    games.forEach(g => (byComp[g.comp] = byComp[g.comp] || []).push(g));
+    vals.compStats = Object.entries(byComp).sort((a,b) => b[1].length - a[1].length).slice(0, 10).map(([comp, arr]) => {
+      const a = arr.reduce((x,g)=>x+g.placement,0)/arr.length;
+      return { comp, games: arr.length, avg: a.toFixed(2), avgColor: a <= 4 ? '#53C0A9' : '#D66470',
+        top4: Math.round(arr.filter(g=>g.placement<=4).length/arr.length*100) + '%',
+        wins: String(arr.filter(g=>g.placement===1).length) };
+    });
+    // log rows
+    const yesNo = (v) => v === true ? 'Yes' : (v === false ? 'No' : '—');
+    const posLabel = {focus:'Focus fire', aggro:'Aggro pull', stats:'Stat gap', none:'None'};
+    vals.logRows = [...games].reverse().map(g => {
+      const c = this.pColors(g.placement);
+      const expanded = s.expandedId === g.id;
+      const mc = MCOLORS[g.mistake] || '#5C6980';
+      return {
+        idLabel: '#' + g.id, date: g.date, placement: g.placement, comp: g.comp, stage: g.stage || '—',
+        pBg: c.bg, pFg: c.fg, mistake: g.mistake || '—', mBg: mc + '22', mFg: mc,
+        augShort: g.augName ? `${g.augName} (${g.augType || '?'})` : '—',
+        chev: expanded ? '▲' : '▼', expanded,
+        toggle: () => this.setState({expandedId: expanded ? null : g.id}),
+        edit: () => this.setState({view: 'entry', editingId: g.id, formError: '', form: {...blankForm(), ...g}}),
+        del: () => this.delGame(g.id),
+        hasTimeline: (g.timeline || []).length > 0,
+        timeline: (g.timeline || []).map(t => ({stage: t.stage || '—', note: t.note})),
+        keyDecision: g.keyDecision || '—', differently: g.differently || '—',
+        facts: [
+          {label: 'Final HP', value: g.hp || '—', color: '#C6CFDE'},
+          {label: 'Augment read', value: g.augRead === 'matched' ? 'Matched opener' : (g.augRead === 'blind' ? 'Taken blind' : '—'), color: g.augRead === 'blind' ? '#E08D5B' : '#C6CFDE'},
+          {label: 'First slam', value: g.slam ? `${g.slam} · ${g.slamMatched === true ? 'on-line' : g.slamMatched === false ? 'off-line' : ''}` : '—', color: '#C6CFDE'},
+          {label: 'Streak / leveling', value: `${g.streak ? g.streak + ' streak' : '—'} · curve ${yesNo(g.levelMatched).toLowerCase()}`, color: '#C6CFDE'},
+          {label: 'Scouted 3-2→3-5', value: yesNo(g.scouted), color: g.scouted === false ? '#D66470' : '#C6CFDE'},
+          {label: 'Stage 4 loss', value: g.s4loss ? `Yes · ${g.s4hp || '?'} HP in · avoidable: ${yesNo(g.s4avoid).toLowerCase()}` : 'No', color: g.s4loss ? '#D66470' : '#C6CFDE'},
+          {label: 'Positioning', value: (posLabel[g.posIssue] || '—') + (g.posNote ? ' · ' + g.posNote : ''), color: '#C6CFDE'},
+          {label: 'Tilted', value: g.tilted ? 'Yes' : 'No', color: g.tilted ? '#D66470' : '#C6CFDE'},
+        ],
+      };
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
